@@ -26,19 +26,21 @@ Der ADS1115 wird an die 11-polige Klemmleiste des SN50V3-LB angeschlossen. Der A
 | :---: | :--- | :---: | :--- |
 | **1** | 3.3V Dauerspannung | - | Nicht belegen für ADS1115 |
 | **2** | **+5V geschaltet** | **VDD / VCC** | Betriebsspannung ADS1115 (wird gesteuert) |
-| **3** | PA4 (ADC1) | - | Freier analoger Eingang 1 (0..3.3V) |
+| **3** | PA4 (ADC1) | - | Analogeingang für SMT50-Temperatur (max. 1.1V nutzbar) |
 | **4** | **SCL** | **SCL** | I2C Clock (Software-I2C auf PA14) |
 | **5** | **SDA** | **SDA** | I2C Data (Software-I2C auf PA15) |
 | **6** | PC13 | - | Digitaler I/O |
 | **7** | PB9 | - | Digitaler I/O |
 | **8** | PB8 | - | Digitaler I/O |
-| **9** | PA8 (ADC3) | - | Freier analoger Eingang 3 (0..3.3V) |
+| **9** | PA8 (ADC3) | - | Analogeingang für SMT50-Temperatur (max. 1.1V nutzbar) |
 | **10**| PB15 | - | Digitaler I/O |
 | **11**| **GND** | **GND & ADDR**| Masse-Bezug & Adresse (ADDR auf GND = `0x48`) |
 
 ### Wichtige Hardware-Hinweise:
 *   **I2C Pull-Up Widerstände**: Stellen Sie sicher, dass auf Ihrem ADS1115-Breakout-Board bereits Pull-Up-Widerstände (z.B. 4.7kΩ oder 10kΩ nach 5V/3.3V) für SDA und SCL verbaut sind. Falls nicht, müssen diese extern hinzugefügt werden.
 *   **Referenzspannung & Signalpegel**: Da der ADS1115 hier mit 5V versorgt wird, ist die Spannungsversorgung vollständig 5V-konform. An den analogen Eingängen des ADS1115 dürfen Spannungen von bis zu 5V (maximal 5.3V) anliegen. Die Pegel der I2C-Leitungen (SDA/SCL) sind dank Open-Drain-Schaltung auf der MCU-Seite 3.3V-kompatibel (die meisten ADS1115-Boards funktionieren problemlos direkt mit den 3.3V-I2C-Leitungen des SN50V3-LB).
+
+> **Hinweis für erweiterte SMT50-Konfigurationen:** Für detaillierte Dokumentation zu 2x, 3x und 4x SMT50-Anschlüssen mit Decodern und erweiterten Verkabelungsschemas siehe auch das Schwester-Projekt [SN50V3-LS](https://github.com/OpenSprinklerShop/SN50V3-LS-ADS) (Abschnitte 2.1–2.3 sowie 3.1–3.3).
 
 ### 2.1 Sonderfall: Anschluss von 2 Truebner SMT50 Sensoren
 
@@ -77,6 +79,8 @@ Ein SMT50 belegt je **2 ADS1115-Kanäle** (ein Analogausgang für Feuchte, einer
 
 Die vier Kanäle werden als Rohwerte `ads1115_ch0 … ch3` (16-Bit) im LoRaWAN-Payload übertragen; die Umrechnung in % VWC und °C erfolgt im Payload-Decoder (siehe Abschnitt 4.1). Als Referenz entsprechen die Formeln dem Truebner SMT50: Feuchte % VWC = V × 50/3, Temperatur °C = (V − 0,5) × 100 (0,5 V = 0 °C, +10 mV/°C).
 
+> **Wichtige Änderung (PA4/PA8):** Die internen Eingänge **PA4** und **PA8** sind nur bis **1.1V** nutzbar. Damit sind sie für SMT50 nur für den Temperaturkanal geeignet (typisch 0.2..1.0V). Für SMT50-Bodenfeuchte (bis 3V) muss auf ADS1115-Kanäle umgeklemmt werden.
+
 ### Montage & Inbetriebnahme
 
 1. **Platine ausbauen:** Schrauben Sie die Hauptplatine aus dem Gehäuse, um ausreichend Platz für das Anklemmen der Sensoradern zu haben.
@@ -93,8 +97,8 @@ Jeder Uplink besteht aus exakt **14 Bytes** im Big-Endian-Format (MSB zuerst).
 | Byte-Index | Name | Datentyp | Wertebereich / Skalierung | Beschreibung |
 | :---: | :--- | :---: | :---: | :--- |
 | **0 - 1** | Batterie-Spannung | `uint16` | z.B. 3600 | Batteriespannung in Millivolt (mV) |
-| **2 - 3** | ADC1 (PA4) | `uint16` | z.B. 1200 | Interner Analogwert PA4 (Spannung in mV) |
-| **4 - 5** | ADC3 (PA8) | `uint16` | z.B. 2400 | Interner Analogwert PA8 (Spannung in mV) |
+| **2 - 3** | ADC1 (PA4) | `uint16` | z.B. 900 | Interner Analogwert PA4 (SMT50-Temperaturbereich, max. 1.1V) |
+| **4 - 5** | ADC3 (PA8) | `uint16` | z.B. 900 | Interner Analogwert PA8 (SMT50-Temperaturbereich, max. 1.1V) |
 | **6 - 7** | ADS1115 Kanal 0 | `int16` | `0` bis `32767` | Raw-Wert ADS1115 A0 (0V = 0, 5V = 32767) |
 | **8 - 9** | ADS1115 Kanal 1 | `int16` | `0` bis `32767` | Raw-Wert ADS1115 A1 (0V = 0, 5V = 32767) |
 | **10 - 11**| ADS1115 Kanal 2 | `int16` | `0` bis `32767` | Raw-Wert ADS1115 A2 (0V = 0, 5V = 32767) |
@@ -107,8 +111,8 @@ Wenn zwei Truebner SMT50-Sensoren wie in Abschnitt 2.1 beschrieben an den ADS111
 | Byte-Index | Name | Datentyp | SMT50 Zuordnung | Beschreibung / Wertebereich |
 | :---: | :--- | :---: | :---: | :--- |
 | **0 - 1** | Batterie-Spannung | `uint16` | - | Batteriespannung in Millivolt (mV) |
-| **2 - 3** | ADC1 (PA4) | `uint16` | - | Interner Analogwert PA4 (freier Eingang, in mV) |
-| **4 - 5** | ADC3 (PA8) | `uint16` | - | Interner Analogwert PA8 (freier Eingang, in mV) |
+| **2 - 3** | ADC1 (PA4) | `uint16` | - | Interner Analogwert PA4 (SMT50 nur Temperatur, max. 1.1V) |
+| **4 - 5** | ADC3 (PA8) | `uint16` | - | Interner Analogwert PA8 (SMT50 nur Temperatur, max. 1.1V) |
 | **6 - 7** | ADS1115 Kanal 0 | `int16` | **SMT50 #1 Bodenfeuchte** | Raw-Wert (0V = 0, 3V = 23999, entspricht 0 bis 50% VWC) |
 | **8 - 9** | ADS1115 Kanal 1 | `int16` | **SMT50 #1 Temperatur** | Raw-Wert (0.1V = 800, 1.1V = 8796, entspricht -40 bis +60 °C) |
 | **10 - 11**| ADS1115 Kanal 2 | `int16` | **SMT50 #2 Bodenfeuchte** | Raw-Wert (0V = 0, 3V = 23999, entspricht 0 bis 50% VWC) |
@@ -133,8 +137,8 @@ Wenn an den Kanälen (A0–A3) des ADS1115 **nichts** angeschlossen ist, befinde
 `0E 1C 04 B0 09 C4 4E 20 00 00 1B 58 7F FF`
 
 *   `0E 1C` (Byte 0-1) = `3612` -> **3612 mV** (Batterie)
-*   `04 B0` (Byte 2-3) = `1200` -> **1200 mV** (ADC1 / PA4)
-*   `09 C4` (Byte 4-5) = `2500` -> **2500 mV** (ADC3 / PA8)
+*   `03 84` (Byte 2-3) = `900` -> **900 mV** (ADC1 / PA4)
+*   `03 84` (Byte 4-5) = `900` -> **900 mV** (ADC3 / PA8)
 *   `4E 20` (Byte 6-7) = `20000` -> $\frac{20000}{32767} \times 5000\text{ mV} =$ **3051.8 mV (3.05V)** (ADS1115 A0)
 *   `00 00` (Byte 8-9) = `0` -> **0 mV (0V)** (ADS1115 A1)
 *   `1B 58` (Byte 10-11) = `7000` -> $\frac{7000}{32767} \times 5000\text{ mV} =$ **1068.1 mV (1.07V)** (ADS1115 A2)
